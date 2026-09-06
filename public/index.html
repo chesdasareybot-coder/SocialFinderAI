@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SocialFinder AI - Find Social Media Profiles by Photo</title>
+  <meta name="description" content="Free, anonymous reverse face search. Find social media profiles across Facebook, Instagram, TikTok, YouTube, and more with a photo.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #070a13;
+      color: #f1f5f9;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    /* Ambient background glow */
+    .ambient-glow {
+      position: absolute;
+      top: -120px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 700px;
+      height: 450px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, rgba(59, 130, 246, 0.08) 50%, transparent 70%);
+      filter: blur(80px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    header {
+      position: relative;
+      z-index: 10;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      background: rgba(7, 10, 19, 0.75);
+      backdrop-filter: blur(16px);
+      padding: 1.25rem 2rem;
+    }
+
+    .header-content {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #ffffff;
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+    }
+
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0.9rem;
+      border-radius: 9999px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      color: #34d399;
+      font-size: 0.825rem;
+      font-weight: 600;
+    }
+
+    .badge-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.9); }
+    }
+
+    main {
+      position: relative;
+      z-index: 10;
+      flex: 1;
+      max-width: 1100px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 3.5rem 1.5rem 5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .hero-text {
+      text-align: center;
+      max-width: 680px;
+      margin-bottom: 2.75rem;
+    }
+
+    .hero-title {
+      font-size: 2.75rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 1rem;
+      background: linear-gradient(180deg, #ffffff 30%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-subtitle {
+      font-size: 1.125rem;
+      color: #94a3b8;
+      font-weight: 400;
+    }
+
+    /* Upload Box */
+    .search-card {
+      width: 100%;
+      max-width: 620px;
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 1.5rem;
+      padding: 2rem;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(20px);
+      transition: border-color 0.2s;
+    }
+
+    .dropzone {
+      border: 2px dashed rgba(255, 255, 255, 0.16);
+      border-radius: 1.25rem;
+      padding: 2.75rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      background: rgba(30, 41, 59, 0.25);
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.85rem;
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: #10b981;
+      background: rgba(16, 185, 129, 0.05);
+      transform: translateY(-2px);
+    }
+
+    .upload-icon-circle {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #34d399;
+      margin-bottom: 0.25rem;
+    }
+
+    .dropzone-text {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+
+    .dropzone-subtext {
+      font-size: 0.85rem;
+      color: #64748b;
+    }
+
+    /* Selected Preview */
+    .preview-container {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.25rem;
+      padding: 1.5rem;
+      background: rgba(30, 41, 59, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 1.25rem;
+    }
+
+    .preview-image {
+      width: 140px;
+      height: 140px;
+      border-radius: 1rem;
+      object-fit: cover;
+      border: 2px solid #10b981;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .preview-details {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .file-name {
+      font-size: 0.925rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      max-width: 250px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #94a3b8;
+      font-size: 0.825rem;
+      font-weight: 600;
+      padding: 0.4rem 0.85rem;
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.4);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    /* Main Action Button */
+    .btn-search {
+      width: 100%;
+      margin-top: 1.25rem;
+      padding: 1rem;
+      border-radius: 1rem;
+      border: none;
+      background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      box-shadow: 0 4px 20px rgba(16, 185, 129, 0.35);
+      transition: all 0.2s ease;
+    }
+
+    .btn-search:hover:not(:disabled) {
+      background: linear-gradient(180deg, #34d399 0%, #10b981 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px rgba(16, 185, 129, 0.5);
+    }
+
+    .btn-search:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Scanning State Box */
+    .scanning-box {
+      display: none;
+      margin-top: 1.5rem;
+      padding: 1.25rem;
+      border-radius: 1rem;
+      background: rgba(16, 185, 129, 0.06);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      text-align: center;
+    }
+
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid rgba(16, 185, 129, 0.2);
+      border-top-color: #10b981;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 0.75rem;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .scanning-title {
+      font-weight: 700;
+      color: #34d399;
+      font-size: 0.95rem;
+    }
+
+    .scanning-desc {
+      font-size: 0.825rem;
+      color: #64748b;
+      margin-top: 0.2rem;
+    }
+
+    /* Results Section */
+    #results-section {
+      display: none;
+      width: 100%;
+      margin-top: 3.5rem;
+    }
+
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 1.25rem;
+    }
+
+    .results-title-group h3 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .results-title-group p {
+      color: #94a3b8;
+      font-size: 0.925rem;
+      margin-top: 0.2rem;
+    }
+
+    .grid-matches {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 1.5rem;
+      width: 100%;
+    }
+
+    /* Result Card */
+    .card-match {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 1.25rem;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(16px);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .card-match:hover {
+      transform: translateY(-4px);
+      border-color: rgba(16, 185, 129, 0.4);
+      box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.5);
+    }
+
+    .match-avatar-frame {
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: #1e293b;
+      border: 2.5px solid #10b981;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1rem;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
+    }
+
+    .match-avatar-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .match-username {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #f8fafc;
+      margin-bottom: 0.25rem;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .match-meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #34d399;
+      margin-bottom: 1.25rem;
+    }
+
+    .btn-profile {
+      display: block;
+      width: 100%;
+      padding: 0.65rem 1rem;
+      border-radius: 9999px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #34d399;
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .btn-profile:hover {
+      background: #10b981;
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+    }
+
+    /* Identity Banner */
+    .identity-banner {
+      display: none;
+      margin-bottom: 2rem;
+      padding: 1.25rem 1.5rem;
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: 1.25rem;
+      backdrop-filter: blur(12px);
+    }
+
+    .identity-banner-title {
+      font-size: 0.825rem;
+      font-weight: 700;
+      color: #34d399;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .identity-tags-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .identity-tag-pill {
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #f1f5f9;
+      font-size: 0.875rem;
+      font-weight: 600;
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+    }
+
+    /* Deep Engines Quick Access Bar */
+    .deep-engines-bar {
+      margin-bottom: 2.25rem;
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 1.25rem;
+      padding: 1.25rem 1.5rem;
+    }
+
+    .deep-engines-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .deep-engines-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .engine-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      padding: 0.75rem 1rem;
+      border-radius: 0.85rem;
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #f8fafc;
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .engine-btn:hover {
+      background: rgba(51, 65, 85, 0.9);
+      border-color: rgba(255, 255, 255, 0.25);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    .engine-btn svg {
+      flex-shrink: 0;
+    }
+
+    footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 2rem;
+      text-align: center;
+      color: #475569;
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 640px) {
+      .hero-title { font-size: 2rem; }
+      .search-card { padding: 1.25rem; }
+      .results-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+      .deep-engines-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-glow"></div>
+
+  <header>
+    <div class="header-content">
+      <a href="/" class="logo">
+        <div class="logo-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </div>
+        <span>SocialFinder<span style="color:#10b981;">.ai</span></span>
+      </a>
+      <div class="badge-status">
+        <span class="badge-dot"></span>
+        <span>Free &amp; Anonymous</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="hero-text">
+      <h1 class="hero-title">Find Anyone Across Social Media</h1>
+      <p class="hero-subtitle">Upload a face photo to search public profiles on Facebook, TikTok, Instagram, YouTube, and more.</p>
+    </div>
+
+    <div class="search-card">
+      <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" style="display: none;">
+
+      <!-- Dropzone -->
+      <div class="dropzone" id="dropzone">
+        <div class="upload-icon-circle">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" x2="12" y1="3" y2="15"></line>
+          </svg>
+        </div>
+        <div class="dropzone-text">Click to upload or drag & drop a photo</div>
+        <div class="dropzone-subtext">JPG, PNG, or WEBP &bull; Max 10MB</div>
+      </div>
+
+      <!-- Preview -->
+      <div class="preview-container" id="preview-container">
+        <img src="" alt="Selected Preview" class="preview-image" id="preview-img">
+        <div class="preview-details">
+          <span class="file-name" id="preview-name">photo.jpg</span>
+          <button type="button" class="btn-secondary" id="btn-change-photo">Change</button>
+        </div>
+      </div>
+
+      <!-- Search Button -->
+      <button type="button" class="btn-search" id="btn-search" disabled>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <span>Search Social Profiles</span>
+      </button>
+
+      <!-- Scanning indicator -->
+      <div class="scanning-box" id="scanning-box">
+        <div class="spinner"></div>
+        <div class="scanning-title">Scanning the web for face matches...</div>
+        <div class="scanning-desc">Searching Facebook, Instagram, TikTok, YouTube & web archives</div>
+      </div>
+    </div>
+
+    <!-- Results Section -->
+    <section id="results-section">
+      <div class="results-header">
+        <div class="results-title-group">
+          <h3>Match Results</h3>
+          <p id="results-count-text">Found potential profiles matching this face</p>
+        </div>
+        <button type="button" class="btn-secondary" id="btn-new-search">New Search</button>
+      </div>
+
+      <!-- Identified Entities / Tags -->
+      <div class="identity-banner" id="identity-banner">
+        <div class="identity-banner-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <circle cx="12" cy="12" r="4"></circle>
+            <line x1="4.93" y1="4.93" x2="9.17" y2="9.17"></line>
+            <line x1="14.83" y1="14.83" x2="19.07" y2="19.07"></line>
+            <line x1="14.83" y1="9.17" x2="19.07" y2="4.93"></line>
+            <line x1="4.93" y1="19.07" x2="9.17" y2="14.83"></line>
+          </svg>
+          <span>Detected Visual Identity &amp; Keywords</span>
+        </div>
+        <div class="identity-tags-list" id="identity-tags-list">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- 1-Click Deep Search Engines Toolbar -->
+      <div class="deep-engines-bar" id="deep-engines-bar" style="display: none;">
+        <div class="deep-engines-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <span>Open Full Multi-Engine Reverse Search</span>
+        </div>
+        <div class="deep-engines-grid">
+          <a href="https://facecheck.id" target="_blank" rel="noopener noreferrer" class="engine-btn" id="link-facecheck" style="border-color: rgba(239, 68, 68, 0.4);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            <span>FaceCheck.ID</span>
+          </a>
+          <a href="#" target="_blank" rel="noopener noreferrer" class="engine-btn" id="link-google-lens">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4285F4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="4"></circle></svg>
+            <span>Google Lens</span>
+          </a>
+          <a href="#" target="_blank" rel="noopener noreferrer" class="engine-btn" id="link-yandex">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#FC3F1D"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm1.75 18h-2.5v-6.5h-1.5V9.25h1.5V6.5c0-1.795 1.455-3.25 3.25-3.25h2.25v2.25H14.5c-.552 0-1 .448-1 1v2.75h3.25l-.5 2.25H13.5V18z"/></svg>
+            <span>Yandex Deep AI</span>
+          </a>
+          <a href="#" target="_blank" rel="noopener noreferrer" class="engine-btn" id="link-bing">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#008373"><path d="M3.75 2v20l4.25-2.5V7.25l7.5 4.5v-5L3.75 2zm11.75 12.25l-4-2.35v4.85l4 2.5 4.75-2.75v-5l-4.75 2.75z"/></svg>
+            <span>Bing Visual</span>
+          </a>
+          <a href="#" target="_blank" rel="noopener noreferrer" class="engine-btn" id="link-tineye">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#00A0E3"><circle cx="12" cy="12" r="10"/></svg>
+            <span>TinEye</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="grid-matches" id="matches-grid">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>SocialFinder AI &copy; 2026 &bull; Private, Anonymous Reverse Facial Lookup</p>
+  </footer>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
