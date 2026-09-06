@@ -244,34 +244,96 @@ async function queryVisualEngine(publicUrl: string): Promise<{ matches: Match[];
     });
   }
 
-  // 3. Smart Cross-Platform Discovery for recognized handles or tags
+  // 3. Guaranteed Cross-Platform Social Discovery
+  let subjectName = "";
   const firstSocial = matches.find((m) => m.platform !== "Web");
   if (firstSocial && firstSocial.username.startsWith("@")) {
-    const handle = firstSocial.username.slice(1).replace(/[^a-zA-Z0-9._-]/g, "");
-    if (handle.length > 2) {
-      const crossPlatforms = [
-        { platform: "Instagram", url: `https://www.instagram.com/${handle}/` },
-        { platform: "TikTok", url: `https://www.tiktok.com/@${handle}` },
-        { platform: "YouTube", url: `https://www.youtube.com/@${handle}` },
-        { platform: "Twitter", url: `https://twitter.com/${handle}` },
-      ];
+    subjectName = firstSocial.username.slice(1).replace(/[^a-zA-Z0-9._-]/g, "");
+  } else if (tags.length > 0 && tags[0]) {
+    subjectName = tags[0].replace(/[^\p{L}\p{N}\s]/gu, "").trim();
+  } else if (matches.length > 0 && matches[0].title) {
+    // Extract subject from top match title
+    const rawTitle = matches[0].title;
+    const cleaned = rawTitle
+      .replace(/https?:\/\/\S+/g, "")
+      .replace(/[|•–—\-_:;]/g, " ")
+      .replace(
+        /\b(professional|headshots?|photograph(?:y|er)?|portraits?|images?|photos?|pictures?|guide|download|free|vector|studio|corporate|individuals?|blogs?)\b/gi,
+        "",
+      )
+      .replace(/\s+/g, " ")
+      .trim();
+    if (cleaned.length > 2) {
+      subjectName = cleaned.slice(0, 40);
+    }
+  }
 
-      for (const cp of crossPlatforms) {
-        if (!seenUrls.has(cp.url) && cp.platform !== firstSocial.platform) {
-          seenUrls.add(cp.url);
-          matches.push({
-            guid: Math.random().toString(36).substring(7),
-            url: cp.url,
-            base64: publicUrl,
-            username: `@${handle}`,
-            platform: cp.platform,
-            title: `Check @${handle} profile on ${cp.platform}`,
-            score: 92,
-          });
-        }
+  if (subjectName) {
+    const cleanTag = encodeURIComponent(subjectName);
+    const cleanHandle = subjectName.replace(/\s+/g, "").toLowerCase();
+
+    const socialLookups = [
+      {
+        platform: "Instagram",
+        url: `https://www.instagram.com/${cleanHandle}/`,
+        username: `@${cleanHandle}`,
+        title: `Explore @${cleanHandle} profile on Instagram`,
+      },
+      {
+        platform: "Facebook",
+        url: `https://www.facebook.com/search/top?q=${cleanTag}`,
+        username: `${subjectName}`,
+        title: `Search Facebook profiles for ${subjectName}`,
+      },
+      {
+        platform: "TikTok",
+        url: `https://www.tiktok.com/search?q=${cleanTag}`,
+        username: `@${cleanHandle}`,
+        title: `Find ${subjectName} videos and profile on TikTok`,
+      },
+      {
+        platform: "YouTube",
+        url: `https://www.youtube.com/results?search_query=${cleanTag}`,
+        username: `${subjectName}`,
+        title: `Find ${subjectName} channel on YouTube`,
+      },
+      {
+        platform: "Twitter",
+        url: `https://twitter.com/search?q=${cleanTag}&f=user`,
+        username: `@${cleanHandle}`,
+        title: `Find ${subjectName} account on X (Twitter)`,
+      },
+      {
+        platform: "LinkedIn",
+        url: `https://www.linkedin.com/search/results/all/?keywords=${cleanTag}`,
+        username: `${subjectName}`,
+        title: `Search ${subjectName} on LinkedIn`,
+      },
+    ];
+
+    for (const s of socialLookups) {
+      if (!seenUrls.has(s.url)) {
+        seenUrls.add(s.url);
+        matches.push({
+          guid: Math.random().toString(36).substring(7),
+          url: s.url,
+          base64: publicUrl,
+          username: s.username,
+          platform: s.platform,
+          title: s.title,
+          score: 95,
+        });
       }
     }
   }
+
+  // 4. Sort results so Social Networks ALWAYS appear first
+  matches.sort((a, b) => {
+    const aSocial = a.platform !== "Web" ? 1 : 0;
+    const bSocial = b.platform !== "Web" ? 1 : 0;
+    if (aSocial !== bSocial) return bSocial - aSocial;
+    return b.score - a.score;
+  });
 
   return { matches, tags };
 }

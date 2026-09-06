@@ -108,6 +108,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (p.includes('tiktok')) {
       return `<svg width="34" height="34" viewBox="0 0 24 24" fill="#ffffff"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64c.298-.002.595.042.88.13V9.4a6.33 6.33 0 0 0-1-.08A6.34 6.34 0 0 0 3 15.66a6.34 6.34 0 0 0 10.83 4.45 6.3 6.3 0 0 0 1.87-4.48V8.69a8.18 8.18 0 0 0 4.78 1.52v-3.4a4.85 4.85 0 0 1-.89-.12z"/></svg>`;
     }
+    if (p.includes('linkedin')) {
+      return `<svg width="34" height="34" viewBox="0 0 24 24" fill="#0A66C2"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>`;
+    }
     return `<svg width="30" height="30" viewBox="0 0 24 24" fill="#ffffff"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`;
   }
 
@@ -215,10 +218,16 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
           <div class="match-username" title="${match.title || match.username}">${match.username}</div>
           <div class="match-meta">
-            <span>${match.platform}</span> &bull; <span>${match.score}% Match</span>
+            <span style="color: ${match.platform !== 'Web' ? '#38bdf8' : '#94a3b8'}; font-weight: 600;">${match.platform}</span> &bull; <span>${match.score}% Match</span>
           </div>
-          <a href="${match.url}" target="_blank" rel="noopener noreferrer" class="btn-profile">
-            ${match.platform === 'YouTube' ? 'Watch Video &nearr;' : 'Open Profile &nearr;'}
+          <a href="${match.url}" target="_blank" rel="noopener noreferrer" class="btn-profile" style="${match.platform !== 'Web' ? 'background: linear-gradient(135deg, #2563eb, #7c3aed); border-color: transparent;' : ''}">
+            ${match.platform === 'YouTube' ? 'Watch on YouTube &nearr;' :
+              match.platform === 'Instagram' ? 'Open on Instagram &nearr;' :
+              match.platform === 'Facebook' ? 'Open on Facebook &nearr;' :
+              match.platform === 'TikTok' ? 'Open on TikTok &nearr;' :
+              match.platform === 'Twitter' ? 'Open on X &nearr;' :
+              match.platform === 'LinkedIn' ? 'Open on LinkedIn &nearr;' :
+              'Visit Website &nearr;'}
           </a>
         `;
 
