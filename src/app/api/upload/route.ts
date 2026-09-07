@@ -10,6 +10,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, getCallerIp } from "@/lib/rate-limit";
 import { put } from "@vercel/blob";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 interface Match {
   guid: string;
   url: string;
