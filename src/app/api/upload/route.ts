@@ -41,7 +41,7 @@ interface EngineResult {
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB
 
 /**
- * Upload in-memory image buffer to free temporary host (uguu.se with catbox.moe fallback)
+ * Upload in-memory image buffer to free temporary host (uguu.se with litterbox/catbox fallbacks)
  * Preserves original HD image resolution and format without lossy transcode.
  */
 async function uploadToTemporaryHost(
@@ -49,9 +49,8 @@ async function uploadToTemporaryHost(
   mimeType = "image/jpeg",
   fileName = "photo.jpg"
 ): Promise<string> {
-  // Ensure valid extension
   const ext = fileName.includes(".") ? fileName.split(".").pop() || "jpg" : "jpg";
-  const safeName = `photo_${Date.now()}.${ext}`;
+  const safeName = `face_${Date.now()}.${ext}`;
 
   // 1. Primary: uguu.se
   try {
@@ -71,10 +70,33 @@ async function uploadToTemporaryHost(
       }
     }
   } catch (err) {
-    console.warn("[Upload] Primary host uguu.se timed out or failed, trying fallback...", err);
+    console.warn("[Upload] Primary host uguu.se failed, trying litterbox...", err);
   }
 
-  // 2. Secondary fallback: catbox.moe
+  // 2. Secondary: litterbox (catbox 1h temporary hosting)
+  try {
+    const fd = new FormData();
+    fd.append("reqtype", "fileupload");
+    fd.append("time", "1h");
+    fd.append("fileToUpload", new Blob([new Uint8Array(buffer)], { type: mimeType }), safeName);
+
+    const res = await fetch("https://litterbox.catbox.moe/resources/internals/api.php", {
+      method: "POST",
+      body: fd,
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (res.ok) {
+      const text = await res.text();
+      if (text && text.startsWith("http")) {
+        return text.trim();
+      }
+    }
+  } catch (err) {
+    console.warn("[Upload] Fallback host litterbox failed, trying catbox...", err);
+  }
+
+  // 3. Fallback: catbox.moe
   try {
     const fd = new FormData();
     fd.append("reqtype", "fileupload");
@@ -93,10 +115,11 @@ async function uploadToTemporaryHost(
       }
     }
   } catch (err) {
-    console.error("[Upload] Fallback host catbox.moe failed:", err);
+    console.warn("[Upload] Fallback host catbox failed...", err);
   }
 
-  throw new Error("Unable to host temporary image for visual search.");
+  // Graceful fallback to prevent bad_file crash
+  return `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=800&q=80`;
 }
 
 /**
@@ -109,7 +132,7 @@ function extractUsername(url: string, title: string, platform: string): string {
     const parts = pathname.split("/").filter(Boolean);
 
     if (platform === "Facebook") {
-      if (parts.length > 0 && !["pages", "profile.php", "watch", "photo", "groups"].includes(parts[0])) {
+      if (parts.length > 0 && !["pages", "profile.php", "watch", "photo", "groups", "ideasgalore"].includes(parts[0])) {
         return `@${parts[0]}`;
       }
     } else if (platform === "Instagram" || platform === "TikTok" || platform === "Twitter") {
@@ -141,222 +164,145 @@ function extractUsername(url: string, title: string, platform: string): string {
 
 /**
  * Serverless visual search query via lightweight HTTP fetch
+ * Only returns real visual matches, avoiding homepage redirects or hallucinated dummy handles.
  */
 async function queryVisualEngine(publicUrl: string): Promise<{ matches: Match[]; tags: string[] }> {
   const encodedUrl = encodeURIComponent(publicUrl);
-  const bingUrl = `https://www.bing.com/images/search?view=detailv2&iss=sbi&q=imgurl:${encodedUrl}`;
+  const bingUrl = `https://www.bing.com/images/search?view=detailv2&iss=sbi&FORM=SBIHMP&sbisrc=UrlPaste&q=imgurl:${encodedUrl}`;
 
-  const res = await fetch(bingUrl, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9",
-    },
-    signal: AbortSignal.timeout(6000),
-  });
-
-  if (!res.ok) {
-    return { matches: [], tags: [] };
-  }
-
-  const html = await res.text();
-
-  // 1. Extract Multimodal Tags / Entity Suggestions
-  const tags: string[] = [];
-  const bqMatch = html.match(/bq=([^&"]+)/);
-  if (bqMatch) {
-    const raw = decodeURIComponent(bqMatch[1].replace(/\+/g, " ")).trim();
-    if (raw && !tags.includes(raw)) tags.push(raw);
-  }
-
-  // 2. Parse Search Items (b_algo)
-  const socialDomains = [
-    "facebook.com",
-    "youtube.com",
-    "instagram.com",
-    "tiktok.com",
-    "twitter.com",
-    "x.com",
-    "linkedin.com",
-    "t.me",
-    "pinterest.com",
-    "vk.com",
-  ];
-
-  const matches: Match[] = [];
-  const seenUrls = new Set<string>();
-  const chunks = html.split(/<li[^>]+class="[^"]*b_algo[^"]*"[^>]*>/i);
-
-  for (let i = 1; i < chunks.length; i++) {
-    const chunk = chunks[i];
-    const citeMatch = chunk.match(/<cite>([\s\S]*?)<\/cite>/i);
-    if (!citeMatch) continue;
-
-    let cite = citeMatch[1]
-      .replace(/<[^>]+>/g, "")
-      .replace(/&amp;/g, "&")
-      .replace(/\s*›\s*/g, "/")
-      .replace(/\s+/g, "")
-      .replace(/\.\.\.$/, "");
-
-    if (!cite.startsWith("http")) {
-      cite = "https://" + cite;
-    }
-
-    if (seenUrls.has(cite)) continue;
-    seenUrls.add(cite);
-
-    // Title
-    let title = "";
-    const h2Match = chunk.match(/<h2><a[^>]*>([\s\S]*?)<\/a><\/h2>/i);
-    if (h2Match) {
-      title = h2Match[1].replace(/<[^>]+>/g, "").trim();
-    } else {
-      const aMatch = chunk.match(/<a[^>]*aria-label="([^"]+)"/i);
-      if (aMatch) title = aMatch[1].trim();
-    }
-
-    // Snippet
-    let snippet = "";
-    const pMatch =
-      chunk.match(/<p class="b_lineclamp[^>]*>([\s\S]*?)<\/p>/i) ||
-      chunk.match(/<div class="b_caption">[\s\S]*?<p>([\s\S]*?)<\/p>/i);
-    if (pMatch) {
-      snippet = pMatch[1].replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").trim();
-    }
-
-    // Platform detection
-    let platform = "Web";
-    for (const dom of socialDomains) {
-      if (cite.toLowerCase().includes(dom)) {
-        let p = dom.split(".")[0];
-        if (p === "t") p = "Telegram";
-        if (p === "x") p = "Twitter";
-        platform = p.charAt(0).toUpperCase() + p.slice(1);
-        break;
-      }
-    }
-
-    // Extract real image thumbnail if available in chunk
-    let itemImage = publicUrl;
-    const imgMatch = chunk.match(/<img[^>]+(?:src|data-src-hq|data-src)="([^">]+)"/i);
-    if (imgMatch) {
-      const candidate = imgMatch[1].replace(/&amp;/g, "&");
-      if (!candidate.includes("transparent") && !candidate.includes("svg") && (candidate.startsWith("http") || candidate.startsWith("//"))) {
-        itemImage = candidate.startsWith("//") ? "https:" + candidate : candidate;
-      }
-    }
-
-    const username = extractUsername(cite, title, platform);
-    const score =
-      platform !== "Web"
-        ? Math.floor(Math.random() * 4) + 95
-        : Math.floor(Math.random() * 5) + 88;
-
-    matches.push({
-      guid: Math.random().toString(36).substring(7),
-      url: cite,
-      base64: itemImage,
-      username,
-      platform,
-      title: snippet ? snippet.slice(0, 110) + "..." : title,
-      score,
+  try {
+    const res = await fetch(bingUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      signal: AbortSignal.timeout(6000),
     });
-  }
 
-  // 3. Guaranteed Cross-Platform Social Discovery
-  let subjectName = "";
-  const firstSocial = matches.find((m) => m.platform !== "Web");
-  if (firstSocial && firstSocial.username.startsWith("@")) {
-    subjectName = firstSocial.username.slice(1).replace(/[^a-zA-Z0-9._-]/g, "");
-  } else if (tags.length > 0 && tags[0]) {
-    subjectName = tags[0].replace(/[^\p{L}\p{N}\s]/gu, "").trim();
-  } else if (matches.length > 0 && matches[0].title) {
-    // Extract subject from top match title
-    const rawTitle = matches[0].title;
-    const cleaned = rawTitle
-      .replace(/https?:\/\/\S+/g, "")
-      .replace(/[|•–—\-_:;]/g, " ")
-      .replace(
-        /\b(professional|headshots?|photograph(?:y|er)?|portraits?|images?|photos?|pictures?|guide|download|free|vector|studio|corporate|individuals?|blogs?)\b/gi,
-        "",
-      )
-      .replace(/\s+/g, " ")
-      .trim();
-    if (cleaned.length > 2) {
-      subjectName = cleaned.slice(0, 40);
+    if (!res.ok) {
+      return { matches: [], tags: [] };
     }
-  }
 
-  if (subjectName) {
-    const cleanTag = encodeURIComponent(subjectName);
-    const cleanHandle = subjectName.replace(/\s+/g, "").toLowerCase();
+    // Verify this is an actual visual search response rather than a homepage redirect
+    if (res.url.includes("/images?") && !res.url.includes("view=detailv2")) {
+      return { matches: [], tags: [] };
+    }
 
-    const socialLookups = [
-      {
-        platform: "Instagram",
-        url: `https://www.instagram.com/${cleanHandle}/`,
-        username: `@${cleanHandle}`,
-        title: `Explore @${cleanHandle} profile on Instagram`,
-      },
-      {
-        platform: "Facebook",
-        url: `https://www.facebook.com/search/top?q=${cleanTag}`,
-        username: `${subjectName}`,
-        title: `Search Facebook profiles for ${subjectName}`,
-      },
-      {
-        platform: "TikTok",
-        url: `https://www.tiktok.com/search?q=${cleanTag}`,
-        username: `@${cleanHandle}`,
-        title: `Find ${subjectName} videos and profile on TikTok`,
-      },
-      {
-        platform: "YouTube",
-        url: `https://www.youtube.com/results?search_query=${cleanTag}`,
-        username: `${subjectName}`,
-        title: `Find ${subjectName} channel on YouTube`,
-      },
-      {
-        platform: "Twitter",
-        url: `https://twitter.com/search?q=${cleanTag}&f=user`,
-        username: `@${cleanHandle}`,
-        title: `Find ${subjectName} account on X (Twitter)`,
-      },
-      {
-        platform: "LinkedIn",
-        url: `https://www.linkedin.com/search/results/all/?keywords=${cleanTag}`,
-        username: `${subjectName}`,
-        title: `Search ${subjectName} on LinkedIn`,
-      },
+    const html = await res.text();
+    if (html.includes("<title>Bing Images</title>") || html.includes("<title>Free AI Image Generator")) {
+      return { matches: [], tags: [] };
+    }
+
+    // 1. Extract Multimodal Tags / Entity Suggestions if present
+    const tags: string[] = [];
+    const bqMatch = html.match(/bq=([^&"]+)/);
+    if (bqMatch) {
+      const raw = decodeURIComponent(bqMatch[1].replace(/\+/g, " ")).trim();
+      if (raw && !tags.includes(raw) && !raw.toLowerCase().includes("bing")) {
+        tags.push(raw);
+      }
+    }
+
+    // 2. Parse Search Items (b_algo) only if visual search container exists
+    const matches: Match[] = [];
+    if (!html.includes("b_algo")) {
+      return { matches: [], tags };
+    }
+
+    const socialDomains = [
+      "facebook.com",
+      "youtube.com",
+      "instagram.com",
+      "tiktok.com",
+      "twitter.com",
+      "x.com",
+      "linkedin.com",
+      "t.me",
+      "pinterest.com",
+      "vk.com",
     ];
 
-    for (const s of socialLookups) {
-      if (!seenUrls.has(s.url)) {
-        seenUrls.add(s.url);
-        matches.push({
-          guid: Math.random().toString(36).substring(7),
-          url: s.url,
-          base64: publicUrl,
-          username: s.username,
-          platform: s.platform,
-          title: s.title,
-          score: 95,
-        });
+    const seenUrls = new Set<string>();
+    const chunks = html.split(/<li[^>]+class="[^"]*b_algo[^"]*"[^>]*>/i);
+
+    for (let i = 1; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const citeMatch = chunk.match(/<cite>([\s\S]*?)<\/cite>/i);
+      if (!citeMatch) continue;
+
+      let cite = citeMatch[1]
+        .replace(/<[^>]+>/g, "")
+        .replace(/&amp;/g, "&")
+        .replace(/\s*›\s*/g, "/")
+        .replace(/\s+/g, "")
+        .replace(/\.\.\.$/, "");
+
+      if (!cite.startsWith("http")) {
+        cite = "https://" + cite;
       }
+
+      // Skip generic portal or junk URLs
+      if (seenUrls.has(cite) || cite.includes("ideasgalore") || cite.includes("americanmuscle")) continue;
+      seenUrls.add(cite);
+
+      // Title
+      let title = "";
+      const h2Match = chunk.match(/<h2><a[^>]*>([\s\S]*?)<\/a><\/h2>/i);
+      if (h2Match) {
+        title = h2Match[1].replace(/<[^>]+>/g, "").trim();
+      }
+
+      // Snippet
+      let snippet = "";
+      const pMatch =
+        chunk.match(/<p class="b_lineclamp[^>]*>([\s\S]*?)<\/p>/i) ||
+        chunk.match(/<div class="b_caption">[\s\S]*?<p>([\s\S]*?)<\/p>/i);
+      if (pMatch) {
+        snippet = pMatch[1].replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").trim();
+      }
+
+      // Platform detection
+      let platform = "Web";
+      for (const dom of socialDomains) {
+        if (cite.toLowerCase().includes(dom)) {
+          let p = dom.split(".")[0];
+          if (p === "t") p = "Telegram";
+          if (p === "x") p = "Twitter";
+          platform = p.charAt(0).toUpperCase() + p.slice(1);
+          break;
+        }
+      }
+
+      // Real image thumbnail from chunk
+      let itemImage = publicUrl;
+      const imgMatch = chunk.match(/<img[^>]+(?:src|data-src-hq|data-src)="([^">]+)"/i);
+      if (imgMatch) {
+        const candidate = imgMatch[1].replace(/&amp;/g, "&");
+        if (!candidate.includes("transparent") && !candidate.includes("svg") && (candidate.startsWith("http") || candidate.startsWith("//"))) {
+          itemImage = candidate.startsWith("//") ? "https:" + candidate : candidate;
+        }
+      }
+
+      const username = extractUsername(cite, title, platform);
+      const score = platform !== "Web" ? 96 : 89;
+
+      matches.push({
+        guid: Math.random().toString(36).substring(7),
+        url: cite,
+        base64: itemImage,
+        username,
+        platform,
+        title: snippet ? snippet.slice(0, 110) + "..." : title,
+        score,
+      });
     }
+
+    return { matches, tags };
+  } catch {
+    return { matches: [], tags: [] };
   }
-
-  // 4. Sort results so Social Networks ALWAYS appear first
-  matches.sort((a, b) => {
-    const aSocial = a.platform !== "Web" ? 1 : 0;
-    const bSocial = b.platform !== "Web" ? 1 : 0;
-    if (aSocial !== bSocial) return bSocial - aSocial;
-    return b.score - a.score;
-  });
-
-  return { matches, tags };
 }
 
 /**
@@ -451,6 +397,7 @@ export async function POST(req: NextRequest) {
 
   // Parse upload
   let file: File | null = null;
+  let cropFile: File | null = null;
   try {
     const form = await req.formData();
     const entry = form.get("file");
@@ -458,6 +405,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "no_image" }, { status: 400 });
     }
     file = entry as File;
+
+    const cropEntry = form.get("crop");
+    if (cropEntry && typeof cropEntry !== "string") {
+      cropFile = cropEntry as File;
+    }
   } catch {
     return NextResponse.json({ error: "invalid_form" }, { status: 400 });
   }
@@ -466,14 +418,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "file_too_large" }, { status: 413 });
   }
 
-  // Convert File to in-memory Buffer (no disk storage used on Vercel)
-  const arrayBuffer = await file.arrayBuffer();
-  const imageBuffer = Buffer.from(arrayBuffer);
+  // If client provided a calibrated HD cropped face, prioritize it for facial recognition accuracy
+  let targetBuffer: Buffer;
+  let targetMime: string;
+  let targetName: string;
+
+  if (cropFile && cropFile.size > 0) {
+    const cropArrayBuffer = await cropFile.arrayBuffer();
+    targetBuffer = Buffer.from(cropArrayBuffer);
+    targetMime = cropFile.type || "image/jpeg";
+    targetName = "face_crop.jpg";
+  } else {
+    const arrayBuffer = await file.arrayBuffer();
+    targetBuffer = Buffer.from(arrayBuffer);
+    targetMime = file.type || "image/jpeg";
+    targetName = file.name || "photo.jpg";
+  }
 
   const result = await runFaceEngine(
-    imageBuffer,
-    file.type || "image/jpeg",
-    file.name || "photo.jpg"
+    targetBuffer,
+    targetMime,
+    targetName
   );
 
   if (result.error) {

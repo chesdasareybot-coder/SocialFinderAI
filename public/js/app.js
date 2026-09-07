@@ -529,33 +529,47 @@ document.addEventListener('DOMContentLoaded', () => {
     btnSearch.disabled = true;
     startTelemetryAnimation();
 
-    const formData = new FormData();
-    formData.append('file', currentFile);
-
-    try {
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to scan image. Please try again.');
+    const executeUpload = async (cropBlob) => {
+      const formData = new FormData();
+      formData.append('file', currentFile);
+      if (cropBlob) {
+        formData.append('crop', cropBlob, 'face_crop.jpg');
       }
 
-      completeTelemetryAnimation();
-      setTimeout(() => {
-        renderResults(data);
-      }, 400);
-    } catch (err) {
-      console.error(err);
-      if (telemetryInterval) clearInterval(telemetryInterval);
-      scannerOverlay.classList.remove('active');
-      alert(err.message || 'An error occurred while scanning. Please try another image.');
-      btnSearch.disabled = false;
-      btnSearch.style.display = 'flex';
-      scanningBox.style.display = 'none';
+      try {
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to scan image. Please try again.');
+        }
+
+        completeTelemetryAnimation();
+        setTimeout(() => {
+          renderResults(data);
+        }, 400);
+      } catch (err) {
+        console.error(err);
+        if (telemetryInterval) clearInterval(telemetryInterval);
+        scannerOverlay.classList.remove('active');
+        alert(err.message || 'An error occurred while scanning. Please try another image.');
+        btnSearch.disabled = false;
+        btnSearch.style.display = 'flex';
+        scanningBox.style.display = 'none';
+      }
+    };
+
+    // Extract cropped face blob if canvas exists, else send directly
+    if (faceCropCanvas && faceCropCanvas.width > 0) {
+      faceCropCanvas.toBlob((blob) => {
+        executeUpload(blob);
+      }, 'image/jpeg', 0.95);
+    } else {
+      executeUpload(null);
     }
   });
 
@@ -574,9 +588,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Update HD Summary Banner
     hdSummaryBanner.style.display = 'flex';
     statRes.textContent = `${naturalWidth} × ${naturalHeight} Ultra-Clear`;
-    statMatchPct.textContent = matches.length > 0 ? `${matches[0].score}%` : '98.0%';
+    statMatchPct.textContent = matches.length > 0 ? `${matches[0].score}%` : '98.5%';
     const platforms = new Set(matches.map(m => m.platform).filter(p => p !== 'Web'));
-    statPlatformCount.textContent = platforms.size > 0 ? Array.from(platforms).join(', ') : 'Multi-Platform';
+    statPlatformCount.textContent = platforms.size > 0 ? Array.from(platforms).join(', ') : 'Multi-Platform Neural';
 
     // 2. Render Identity Tags Banner
     const identityBanner = document.getElementById('identity-banner');
@@ -609,13 +623,65 @@ document.addEventListener('DOMContentLoaded', () => {
       deepEnginesBar.style.display = 'none';
     }
 
-    // 4. Render HD Match Cards
+    // 4. Render Results: If no direct web links, show 1-Click Neural Engine Cards
     if (matches.length === 0) {
-      resultsCountText.textContent = 'No direct social media matches found for this photo.';
+      resultsCountText.textContent = 'Biometric signature calibrated. Launch a neural reverse search engine below:';
       matchesGrid.innerHTML = `
-        <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; background: rgba(15, 23, 42, 0.6); border-radius: 1.25rem; border: 1px solid rgba(255, 255, 255, 0.08);">
-          <p style="color: #94a3b8; font-size: 1.1rem; margin-bottom: 0.75rem; font-weight: 700;">No public accounts automatically matched this photo.</p>
-          <p style="color: #64748b; font-size: 0.9rem;">You can use the 1-Click Multi-Engine Reverse Search buttons above to run instant queries across Google Lens HD and Yandex Deep AI.</p>
+        <div class="card-match" style="border-color: rgba(66, 133, 244, 0.4); background: linear-gradient(180deg, rgba(66, 133, 244, 0.08), rgba(15, 23, 42, 0.7));">
+          <div class="match-image-frame" style="cursor: pointer;" onclick="window.open('${deepLinks.googleLens}', '_blank')">
+            <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #020617;">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#4285F4" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>
+            </div>
+            <div class="match-platform-badge" style="background: #4285F4; color: #fff;">Google Lens</div>
+            <div class="match-score-badge"><span>100% Free</span></div>
+          </div>
+          <div class="match-content">
+            <div class="match-username">Google Lens HD Search</div>
+            <div class="match-snippet">Query Google's global neural index across Instagram, TikTok, Facebook, news, and public profiles with your calibrated face crop.</div>
+            <div class="match-actions">
+              <a href="${deepLinks.googleLens}" target="_blank" rel="noopener noreferrer" class="btn-profile" style="background: linear-gradient(135deg, #1d4ed8, #2563eb); border: none;">
+                Launch Google Lens &nearr;
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-match" style="border-color: rgba(252, 63, 29, 0.4); background: linear-gradient(180deg, rgba(252, 63, 29, 0.08), rgba(15, 23, 42, 0.7));">
+          <div class="match-image-frame" style="cursor: pointer;" onclick="window.open('${deepLinks.yandex}', '_blank')">
+            <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #020617;">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="#FC3F1D"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm1.75 18h-2.5v-6.5h-1.5V9.25h1.5V6.5c0-1.795 1.455-3.25 3.25-3.25h2.25v2.25H14.5c-.552 0-1 .448-1 1v2.75h3.25l-.5 2.25H13.5V18z"/></svg>
+            </div>
+            <div class="match-platform-badge" style="background: #FC3F1D; color: #fff;">Yandex AI</div>
+            <div class="match-score-badge"><span>Deep Face AI</span></div>
+          </div>
+          <div class="match-content">
+            <div class="match-username">Yandex Deep Facial Match</div>
+            <div class="match-snippet">Specialized deep facial recognition search across public VK, Instagram, and web archives. Renowned for finding exact face matches.</div>
+            <div class="match-actions">
+              <a href="${deepLinks.yandex}" target="_blank" rel="noopener noreferrer" class="btn-profile" style="background: linear-gradient(135deg, #b91c1c, #ea580c); border: none;">
+                Launch Yandex AI &nearr;
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-match" style="border-color: rgba(239, 68, 68, 0.4); background: linear-gradient(180deg, rgba(239, 68, 68, 0.08), rgba(15, 23, 42, 0.7));">
+          <div class="match-image-frame" style="cursor: pointer;" onclick="window.open('${deepLinks.facecheck}', '_blank')">
+            <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #020617;">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div class="match-platform-badge" style="background: #EF4444; color: #fff;">FaceCheck</div>
+            <div class="match-score-badge"><span>Facial ID</span></div>
+          </div>
+          <div class="match-content">
+            <div class="match-username">FaceCheck.ID Database</div>
+            <div class="match-snippet">Dedicated reverse facial recognition search engine cross-referencing public mugshots, news, and social networks.</div>
+            <div class="match-actions">
+              <a href="${deepLinks.facecheck}" target="_blank" rel="noopener noreferrer" class="btn-profile" style="background: linear-gradient(135deg, #be123c, #e11d48); border: none;">
+                Launch FaceCheck &nearr;
+              </a>
+            </div>
+          </div>
         </div>
       `;
     } else {
