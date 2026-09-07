@@ -39,13 +39,21 @@ const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB
 
 /**
  * Upload in-memory image buffer to free temporary host (uguu.se with catbox.moe fallback)
- * No server storage required.
+ * Preserves original HD image resolution and format without lossy transcode.
  */
-async function uploadToTemporaryHost(buffer: Buffer): Promise<string> {
+async function uploadToTemporaryHost(
+  buffer: Buffer,
+  mimeType = "image/jpeg",
+  fileName = "photo.jpg"
+): Promise<string> {
+  // Ensure valid extension
+  const ext = fileName.includes(".") ? fileName.split(".").pop() || "jpg" : "jpg";
+  const safeName = `photo_${Date.now()}.${ext}`;
+
   // 1. Primary: uguu.se
   try {
     const fd = new FormData();
-    fd.append("files[]", new Blob([new Uint8Array(buffer)], { type: "image/jpeg" }), "photo.jpg");
+    fd.append("files[]", new Blob([new Uint8Array(buffer)], { type: mimeType }), safeName);
 
     const res = await fetch("https://uguu.se/upload.php", {
       method: "POST",
@@ -67,7 +75,7 @@ async function uploadToTemporaryHost(buffer: Buffer): Promise<string> {
   try {
     const fd = new FormData();
     fd.append("reqtype", "fileupload");
-    fd.append("fileToUpload", new Blob([new Uint8Array(buffer)], { type: "image/jpeg" }), "photo.jpg");
+    fd.append("fileToUpload", new Blob([new Uint8Array(buffer)], { type: mimeType }), safeName);
 
     const res = await fetch("https://catbox.moe/user/api.php", {
       method: "POST",
@@ -227,6 +235,16 @@ async function queryVisualEngine(publicUrl: string): Promise<{ matches: Match[];
       }
     }
 
+    // Extract real image thumbnail if available in chunk
+    let itemImage = publicUrl;
+    const imgMatch = chunk.match(/<img[^>]+(?:src|data-src-hq|data-src)="([^">]+)"/i);
+    if (imgMatch) {
+      const candidate = imgMatch[1].replace(/&amp;/g, "&");
+      if (!candidate.includes("transparent") && !candidate.includes("svg") && (candidate.startsWith("http") || candidate.startsWith("//"))) {
+        itemImage = candidate.startsWith("//") ? "https:" + candidate : candidate;
+      }
+    }
+
     const username = extractUsername(cite, title, platform);
     const score =
       platform !== "Web"
@@ -236,7 +254,7 @@ async function queryVisualEngine(publicUrl: string): Promise<{ matches: Match[];
     matches.push({
       guid: Math.random().toString(36).substring(7),
       url: cite,
-      base64: publicUrl,
+      base64: itemImage,
       username,
       platform,
       title: snippet ? snippet.slice(0, 110) + "..." : title,
@@ -341,7 +359,11 @@ async function queryVisualEngine(publicUrl: string): Promise<{ matches: Match[];
 /**
  * Main Face & Image Search Handler
  */
-async function runFaceEngine(buffer: Buffer): Promise<EngineResult> {
+async function runFaceEngine(
+  buffer: Buffer,
+  mimeType = "image/jpeg",
+  fileName = "photo.jpg"
+): Promise<EngineResult> {
   try {
     // Optional: Archive uploaded photo to Vercel Blob storage
     if (process.env.BLOB_READ_WRITE_TOKEN) {
@@ -358,7 +380,7 @@ async function runFaceEngine(buffer: Buffer): Promise<EngineResult> {
     }
 
     // Step 1: Upload in-memory buffer to temporary host (0 disk storage)
-    const publicImageUrl = await uploadToTemporaryHost(buffer);
+    const publicImageUrl = await uploadToTemporaryHost(buffer, mimeType, fileName);
 
     const encodedUrl = encodeURIComponent(publicImageUrl);
     const deepSearchLinks = {
@@ -445,7 +467,11 @@ export async function POST(req: NextRequest) {
   const arrayBuffer = await file.arrayBuffer();
   const imageBuffer = Buffer.from(arrayBuffer);
 
-  const result = await runFaceEngine(imageBuffer);
+  const result = await runFaceEngine(
+    imageBuffer,
+    file.type || "image/jpeg",
+    file.name || "photo.jpg"
+  );
 
   if (result.error) {
     const errorMap: Record<string, number> = {
