@@ -271,11 +271,69 @@
       box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
     }
 
+    /* ── Viewport Controls & Zoom ── */
+    .viewport-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      background: rgba(2, 6, 23, 0.6);
+      padding: 2px 6px;
+      border-radius: 0.6rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .btn-ctrl {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 700;
+      transition: all 0.15s;
+    }
+
+    .btn-ctrl:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #38bdf8;
+    }
+
+    .zoom-level {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #cbd5e1;
+      min-width: 38px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .viewport-hint-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.775rem;
+      color: #94a3b8;
+      background: rgba(2, 6, 23, 0.45);
+      border: 1px dashed rgba(56, 189, 248, 0.25);
+      padding: 0.5rem 0.85rem;
+      border-radius: 0.6rem;
+      margin-top: -0.25rem;
+    }
+
+    .viewport-hint-bar strong {
+      color: #38bdf8;
+    }
+
     /* Viewport Area */
     .viewport-wrapper {
       position: relative;
       width: 100%;
-      height: 330px;
+      height: 340px;
       border-radius: 1rem;
       overflow: hidden;
       background: #020617;
@@ -284,13 +342,37 @@
       align-items: center;
       justify-content: center;
       box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.8);
+      cursor: default;
     }
 
-    .preview-image, .face-crop-canvas {
+    .viewport-wrapper.can-pan {
+      cursor: grab;
+    }
+
+    .viewport-wrapper.panning {
+      cursor: grabbing;
+    }
+
+    .preview-image {
       max-width: 100%;
       max-height: 100%;
-      width: 100%;
-      height: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+      display: block;
+      transform-origin: center center;
+      transition: transform 0.08s ease-out;
+      user-select: none;
+      pointer-events: auto;
+    }
+
+    .face-crop-canvas {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
       object-fit: contain;
       image-rendering: -webkit-optimize-contrast;
       image-rendering: crisp-edges;
@@ -301,14 +383,10 @@
     .scanner-overlay {
       position: absolute;
       inset: 0;
-      pointer-events: none;
-      display: none;
       overflow: hidden;
       z-index: 20;
-    }
-
-    .scanner-overlay.active {
       display: block;
+      pointer-events: none;
     }
 
     .scanner-laser {
@@ -319,6 +397,11 @@
       background: linear-gradient(90deg, transparent, #38bdf8 20%, #10b981 50%, #38bdf8 80%, transparent);
       box-shadow: 0 0 18px 4px rgba(56, 189, 248, 0.9), 0 0 35px 8px rgba(16, 185, 129, 0.7);
       animation: laserSweep 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+      display: none;
+    }
+
+    .scanner-overlay.active .scanner-laser {
+      display: block;
     }
 
     @keyframes laserSweep {
@@ -342,8 +425,48 @@
       height: 160px;
       top: calc(50% - 80px);
       left: calc(50% - 70px);
-      transition: all 0.25s ease-out;
       box-sizing: border-box;
+      pointer-events: auto;
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+      border: 1px dashed rgba(56, 189, 248, 0.4);
+      border-radius: 8px;
+      background: rgba(56, 189, 248, 0.05);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .scanner-reticle:hover {
+      border-color: rgba(56, 189, 248, 0.9);
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+    }
+
+    .scanner-reticle.dragging {
+      cursor: grabbing;
+      border-color: #38bdf8;
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.6), inset 0 0 15px rgba(56, 189, 248, 0.2);
+    }
+
+    .reticle-grip-handle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      background: rgba(2, 6, 23, 0.8);
+      padding: 5px 9px;
+      border-radius: 6px;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #38bdf8;
+      font-size: 0.58rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      pointer-events: none;
+      opacity: 0.85;
+      backdrop-filter: blur(4px);
     }
 
     .reticle-corner {
@@ -1233,6 +1356,19 @@
             <span class="pulse-dot"></span>
             <span id="hd-badge-text">HD 1080P CALIBRATED</span>
           </div>
+
+          <!-- Pan / Zoom Controls -->
+          <div class="viewport-controls">
+            <button type="button" class="btn-ctrl" id="btn-zoom-out" title="Zoom Out (-)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <span class="zoom-level" id="zoom-level-text">100%</span>
+            <button type="button" class="btn-ctrl" id="btn-zoom-in" title="Zoom In (+)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <button type="button" class="btn-ctrl" id="btn-reset-view" title="Reset Position & Zoom">↺</button>
+          </div>
+
           <div class="preview-tabs">
             <button type="button" class="preview-tab active" id="tab-full-image">Full Image</button>
             <button type="button" class="preview-tab" id="tab-face-crop">HD Face Crop</button>
@@ -1253,6 +1389,17 @@
               <div class="reticle-corner bottom-left"></div>
               <div class="reticle-corner bottom-right"></div>
               <span class="reticle-tag" id="reticle-tag">BIOMETRIC TARGET // 1080P</span>
+              <div class="reticle-grip-handle">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="5 9 2 12 5 15"></polyline>
+                  <polyline points="9 5 12 2 15 5"></polyline>
+                  <polyline points="15 19 12 22 9 19"></polyline>
+                  <polyline points="19 9 22 12 19 15"></polyline>
+                  <line x1="2" y1="12" x2="22" y2="12"></line>
+                  <line x1="12" y1="2" x2="12" y2="22"></line>
+                </svg>
+                <span>DRAG TO TARGET</span>
+              </div>
             </div>
             <div class="biometric-nodes-layer" id="biometric-nodes-layer"></div>
             <div class="scanner-hud-text">
@@ -1260,6 +1407,12 @@
               <span class="hud-status" id="hud-status">READY FOR SCAN</span>
             </div>
           </div>
+        </div>
+
+        <!-- Interactive Move & Target Guide -->
+        <div class="viewport-hint-bar">
+          <span class="hint-icon">💡</span>
+          <span><strong>Move & Target Face:</strong> Drag the cyan reticle over any face or drag the image to pan. Click anywhere on the image to relocate reticle.</span>
         </div>
 
         <div class="preview-details">

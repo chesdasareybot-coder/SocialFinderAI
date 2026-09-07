@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('SocialFinder AI — High-Definition Biometric UI Initialized');
+  console.log('SocialFinder AI — High-Definition Interactive Biometric UI Initialized');
 
   // DOM Elements
   const fileInput = document.getElementById('file-input');
@@ -12,11 +12,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnChangePhoto = document.getElementById('btn-change-photo');
   const tabFullImage = document.getElementById('tab-full-image');
   const tabFaceCrop = document.getElementById('tab-face-crop');
+  const viewportWrapper = document.getElementById('viewport-wrapper');
   const scannerOverlay = document.getElementById('scanner-overlay');
   const scannerReticle = document.getElementById('scanner-reticle');
   const biometricNodesLayer = document.getElementById('biometric-nodes-layer');
   const hudStatus = document.getElementById('hud-status');
   const btnSearch = document.getElementById('btn-search');
+
+  // Pan & Zoom Controls
+  const btnZoomIn = document.getElementById('btn-zoom-in');
+  const btnZoomOut = document.getElementById('btn-zoom-out');
+  const btnResetView = document.getElementById('btn-reset-view');
+  const zoomLevelText = document.getElementById('zoom-level-text');
 
   // Telemetry Elements
   const scanningBox = document.getElementById('scanning-box');
@@ -51,12 +58,29 @@ document.addEventListener('DOMContentLoaded', () => {
   const lightboxScore = document.getElementById('lightbox-score');
   const btnLightboxVisit = document.getElementById('btn-lightbox-visit');
 
+  // State
   let currentFile = null;
+  let loadedImageObj = null;
   let hdFaceCropDataUrl = '';
   let naturalWidth = 0;
   let naturalHeight = 0;
   let telemetryInterval = null;
   let latestMatches = [];
+
+  // Pan & Zoom State
+  let zoomScale = 1.0;
+  let panX = 0;
+  let panY = 0;
+  let isPanningImage = false;
+  let panStartX = 0;
+  let panStartY = 0;
+
+  // Reticle Dragging State
+  let isDraggingReticle = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let reticleStartLeft = 0;
+  let reticleStartTop = 0;
 
   // ── Drag & Drop Listeners ──
   ['dragenter', 'dragover'].forEach(eventName => {
@@ -103,6 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
     tabFaceCrop.classList.remove('active');
     previewImg.style.display = 'block';
     faceCropCanvas.style.display = 'none';
+    scannerOverlay.style.display = 'block';
   });
 
   tabFaceCrop.addEventListener('click', () => {
@@ -110,6 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
     tabFullImage.classList.remove('active');
     previewImg.style.display = 'none';
     faceCropCanvas.style.display = 'block';
+    scannerOverlay.style.display = 'none';
   });
 
   // ── File Selection & HD Image Ingestion ──
@@ -124,6 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
+        loadedImageObj = img;
         naturalWidth = img.naturalWidth;
         naturalHeight = img.naturalHeight;
 
@@ -132,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Display HD Resolution & Size
         const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
-        const resTier = naturalWidth >= 1920 || naturalHeight >= 1080 ? 'Ultra HD' : 'HD Ready';
+        const resTier = naturalWidth >= 1920 || naturalHeight >= 1080 ? 'Ultra HD 1080p+' : 'HD Ready';
         previewSize.textContent = `${naturalWidth} × ${naturalHeight} px (${resTier}) • ${sizeMb} MB`;
 
         // Switch to preview view
@@ -140,78 +167,268 @@ document.addEventListener('DOMContentLoaded', () => {
         previewContainer.style.display = 'flex';
         btnSearch.disabled = false;
 
-        // Perform Client-side HD Face Detection and Crop
-        performClientHDFaceAnalysis(img);
+        // Reset Pan & Zoom
+        resetPanAndZoom();
+
+        // Perform Initial Face Localization and Placement
+        initializeReticlePosition();
       };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
   }
 
-  // ── Client-side HD Face Localization & Crop Extraction ──
-  function performClientHDFaceAnalysis(img) {
-    // 1. Locate Face Region (Proportional Face Centroid)
-    const iw = img.naturalWidth;
-    const ih = img.naturalHeight;
+  // ── Initialize Reticle Position ──
+  function initializeReticlePosition() {
+    // Center reticle by default with slight upper portrait bias (38% from top)
+    const vw = viewportWrapper.clientWidth || 600;
+    const vh = viewportWrapper.clientHeight || 340;
+    const rw = 150;
+    const rh = 170;
 
-    // Face detection estimate: default upper-center thirds portrait box
-    let boxW = Math.round(iw * 0.45);
-    let boxH = Math.round(ih * 0.45);
-    let boxX = Math.round((iw - boxW) / 2);
-    let boxY = Math.round(ih * 0.15);
+    scannerReticle.style.width = `${rw}px`;
+    scannerReticle.style.height = `${rh}px`;
 
-    // Keep square-ish aspect ratio for face signature
-    const size = Math.min(boxW, boxH);
-    boxW = size;
-    boxH = size;
+    const left = Math.round((vw - rw) / 2);
+    const top = Math.round(vh * 0.25);
 
-    // Ensure within bounds
-    boxX = Math.max(0, Math.min(iw - boxW, boxX));
-    boxY = Math.max(0, Math.min(ih - boxH, boxY));
+    scannerReticle.style.left = `${left}px`;
+    scannerReticle.style.top = `${top}px`;
 
-    // 2. Render HD Crop into Canvas (Zero resolution downsampling)
-    faceCropCanvas.width = 400;
-    faceCropCanvas.height = 400;
-    const ctx = faceCropCanvas.getContext('2d');
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, boxX, boxY, boxW, boxH, 0, 0, 400, 400);
+    updateBiometricNodes();
+    updateCropFromReticle();
+    if (hudStatus) hudStatus.textContent = 'TARGET CALIBRATED';
+  }
 
-    hdFaceCropDataUrl = faceCropCanvas.toDataURL('image/jpeg', 0.95);
-    hdSummaryCropImg.src = hdFaceCropDataUrl;
-    lightboxSourceImg.src = hdFaceCropDataUrl;
-
-    // 3. Configure HUD Reticle position over image in viewport
-    scannerReticle.style.width = '160px';
-    scannerReticle.style.height = '160px';
-    scannerReticle.style.left = 'calc(50% - 80px)';
-    scannerReticle.style.top = 'calc(45% - 80px)';
-
-    // 4. Generate 7 Biometric landmark tracking nodes
+  // ── Dynamic Biometric Nodes Placement ──
+  function updateBiometricNodes() {
     biometricNodesLayer.innerHTML = '';
+    const rw = scannerReticle.offsetWidth || 150;
+    const rh = scannerReticle.offsetHeight || 170;
+    const rLeft = scannerReticle.offsetLeft;
+    const rTop = scannerReticle.offsetTop;
+
+    // 7 Anatomical facial tracking points relative to the reticle
     const points = [
-      { x: '42%', y: '40%' }, // Left Eye
-      { x: '58%', y: '40%' }, // Right Eye
-      { x: '50%', y: '46%' }, // Nose Bridge
-      { x: '50%', y: '52%' }, // Nose Tip
-      { x: '44%', y: '62%' }, // Mouth Left
-      { x: '56%', y: '62%' }, // Mouth Right
-      { x: '50%', y: '72%' }  // Chin
+      { x: rLeft + rw * 0.36, y: rTop + rh * 0.38 }, // Left Eye
+      { x: rLeft + rw * 0.64, y: rTop + rh * 0.38 }, // Right Eye
+      { x: rLeft + rw * 0.50, y: rTop + rh * 0.48 }, // Nose Bridge
+      { x: rLeft + rw * 0.50, y: rTop + rh * 0.58 }, // Nose Tip
+      { x: rLeft + rw * 0.38, y: rTop + rh * 0.70 }, // Mouth Left
+      { x: rLeft + rw * 0.62, y: rTop + rh * 0.70 }, // Mouth Right
+      { x: rLeft + rw * 0.50, y: rTop + rh * 0.84 }  // Chin
     ];
 
     points.forEach(p => {
       const node = document.createElement('div');
       node.className = 'biometric-point';
-      node.style.left = p.x;
-      node.style.top = p.y;
+      node.style.left = `${p.x}px`;
+      node.style.top = `${p.y}px`;
       biometricNodesLayer.appendChild(node);
     });
-
-    if (hudStatus) hudStatus.textContent = 'CALIBRATED & READY';
   }
 
+  // ── Real-Time HD Face Crop Generation From Reticle ──
+  function updateCropFromReticle() {
+    if (!loadedImageObj) return;
+
+    // Get current rendered bounds of previewImg
+    const imgRect = previewImg.getBoundingClientRect();
+    const retRect = scannerReticle.getBoundingClientRect();
+
+    if (imgRect.width <= 0 || imgRect.height <= 0) return;
+
+    // Compute relative reticle coordinates within rendered image
+    const relLeft = retRect.left - imgRect.left;
+    const relTop = retRect.top - imgRect.top;
+    const relWidth = retRect.width;
+    const relHeight = retRect.height;
+
+    // Ratio from rendered display dimensions to original natural pixel dimensions
+    const scaleX = loadedImageObj.naturalWidth / imgRect.width;
+    const scaleY = loadedImageObj.naturalHeight / imgRect.height;
+
+    let cropX = relLeft * scaleX;
+    let cropY = relTop * scaleY;
+    let cropW = relWidth * scaleX;
+    let cropH = relHeight * scaleY;
+
+    // Clamp inside image natural bounds
+    cropX = Math.max(0, Math.min(loadedImageObj.naturalWidth - 10, cropX));
+    cropY = Math.max(0, Math.min(loadedImageObj.naturalHeight - 10, cropY));
+    cropW = Math.max(10, Math.min(loadedImageObj.naturalWidth - cropX, cropW));
+    cropH = Math.max(10, Math.min(loadedImageObj.naturalHeight - cropY, cropH));
+
+    // Render HD Crop into 400x400 Canvas
+    faceCropCanvas.width = 400;
+    faceCropCanvas.height = 400;
+    const ctx = faceCropCanvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.clearRect(0, 0, 400, 400);
+
+    try {
+      ctx.drawImage(loadedImageObj, cropX, cropY, cropW, cropH, 0, 0, 400, 400);
+      hdFaceCropDataUrl = faceCropCanvas.toDataURL('image/jpeg', 0.95);
+      hdSummaryCropImg.src = hdFaceCropDataUrl;
+      lightboxSourceImg.src = hdFaceCropDataUrl;
+    } catch (e) {
+      console.warn('Canvas crop draw failed', e);
+    }
+  }
+
+  // ── Drag & Move Reticle Handlers ──
+  scannerReticle.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    isDraggingReticle = true;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    reticleStartLeft = scannerReticle.offsetLeft;
+    reticleStartTop = scannerReticle.offsetTop;
+    scannerReticle.classList.add('dragging');
+    scannerReticle.setPointerCapture(e.pointerId);
+    if (hudStatus) hudStatus.textContent = 'POSITIONING TARGET...';
+  });
+
+  scannerReticle.addEventListener('pointermove', (e) => {
+    if (!isDraggingReticle) return;
+    e.preventDefault();
+
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+
+    const vw = viewportWrapper.clientWidth;
+    const vh = viewportWrapper.clientHeight;
+    const rw = scannerReticle.offsetWidth;
+    const rh = scannerReticle.offsetHeight;
+
+    const newLeft = Math.max(0, Math.min(vw - rw, reticleStartLeft + dx));
+    const newTop = Math.max(0, Math.min(vh - rh, reticleStartTop + dy));
+
+    scannerReticle.style.left = `${newLeft}px`;
+    scannerReticle.style.top = `${newTop}px`;
+
+    updateBiometricNodes();
+    updateCropFromReticle();
+  });
+
+  scannerReticle.addEventListener('pointerup', (e) => {
+    if (isDraggingReticle) {
+      isDraggingReticle = false;
+      scannerReticle.classList.remove('dragging');
+      try { scannerReticle.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (hudStatus) hudStatus.textContent = 'TARGET LOCKED';
+      updateCropFromReticle();
+    }
+  });
+
+  scannerReticle.addEventListener('pointercancel', () => {
+    if (isDraggingReticle) {
+      isDraggingReticle = false;
+      scannerReticle.classList.remove('dragging');
+    }
+  });
+
+  // ── 1-Click Reticle Relocation On Image ──
+  viewportWrapper.addEventListener('click', (e) => {
+    if (isDraggingReticle || isPanningImage) return;
+    if (e.target.closest('#scanner-reticle') || e.target.closest('.preview-header') || e.target.closest('.viewport-controls')) return;
+
+    const rect = viewportWrapper.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    const rw = scannerReticle.offsetWidth;
+    const rh = scannerReticle.offsetHeight;
+    const newLeft = Math.max(0, Math.min(viewportWrapper.clientWidth - rw, clickX - rw / 2));
+    const newTop = Math.max(0, Math.min(viewportWrapper.clientHeight - rh, clickY - rh / 2));
+
+    scannerReticle.style.left = `${newLeft}px`;
+    scannerReticle.style.top = `${newTop}px`;
+
+    updateBiometricNodes();
+    updateCropFromReticle();
+    if (hudStatus) hudStatus.textContent = 'TARGET RELOCATED';
+  });
+
+  // ── Pan & Zoom Functions ──
+  function setZoom(newZoom) {
+    zoomScale = Math.max(1.0, Math.min(3.5, Math.round(newZoom * 100) / 100));
+    if (zoomScale === 1.0) {
+      panX = 0;
+      panY = 0;
+      viewportWrapper.classList.remove('can-pan');
+    } else {
+      viewportWrapper.classList.add('can-pan');
+    }
+    applyImageTransform();
+  }
+
+  function applyImageTransform() {
+    previewImg.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomScale})`;
+    if (zoomLevelText) zoomLevelText.textContent = `${Math.round(zoomScale * 100)}%`;
+    updateCropFromReticle();
+  }
+
+  function resetPanAndZoom() {
+    zoomScale = 1.0;
+    panX = 0;
+    panY = 0;
+    viewportWrapper.classList.remove('can-pan', 'panning');
+    applyImageTransform();
+  }
+
+  btnZoomIn.addEventListener('click', () => setZoom(zoomScale + 0.25));
+  btnZoomOut.addEventListener('click', () => setZoom(zoomScale - 0.25));
+  btnResetView.addEventListener('click', () => {
+    resetPanAndZoom();
+    initializeReticlePosition();
+  });
+
+  // Mouse Wheel Zoom
+  viewportWrapper.addEventListener('wheel', (e) => {
+    if (!currentFile) return;
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 0.2 : -0.2;
+    setZoom(zoomScale + delta);
+  }, { passive: false });
+
+  // Pan / Drag Image
+  viewportWrapper.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('#scanner-reticle')) return;
+    if (zoomScale <= 1.0) return;
+
+    isPanningImage = true;
+    panStartX = e.clientX - panX;
+    panStartY = e.clientY - panY;
+    viewportWrapper.classList.add('panning');
+    viewportWrapper.setPointerCapture(e.pointerId);
+  });
+
+  viewportWrapper.addEventListener('pointermove', (e) => {
+    if (!isPanningImage) return;
+    panX = e.clientX - panStartX;
+    panY = e.clientY - panStartY;
+    applyImageTransform();
+  });
+
+  viewportWrapper.addEventListener('pointerup', (e) => {
+    if (isPanningImage) {
+      isPanningImage = false;
+      viewportWrapper.classList.remove('panning');
+      try { viewportWrapper.releasePointerCapture(e.pointerId); } catch (_) {}
+    }
+  });
+
+  viewportWrapper.addEventListener('pointercancel', () => {
+    isPanningImage = false;
+    viewportWrapper.classList.remove('panning');
+  });
+
+  // ── Reset All Selection ──
   function resetSelection() {
     currentFile = null;
+    loadedImageObj = null;
     fileInput.value = '';
     previewImg.src = '';
     hdFaceCropDataUrl = '';
@@ -226,6 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
     tabFaceCrop.classList.remove('active');
     previewImg.style.display = 'block';
     faceCropCanvas.style.display = 'none';
+    resetPanAndZoom();
 
     // Reset telemetry
     if (telemetryInterval) clearInterval(telemetryInterval);
