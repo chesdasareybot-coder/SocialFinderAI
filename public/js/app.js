@@ -180,17 +180,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── Initialize Reticle Position ──
   function initializeReticlePosition() {
-    // Center reticle by default with slight upper portrait bias (38% from top)
-    const vw = viewportWrapper.clientWidth || 600;
-    const vh = viewportWrapper.clientHeight || 340;
-    const rw = 150;
-    const rh = 170;
+    const vw = viewportWrapper.clientWidth || 360;
+    const vh = viewportWrapper.clientHeight || 270;
+    const isMobile = vw < 500;
+    const rw = isMobile ? 120 : 150;
+    const rh = isMobile ? 140 : 170;
 
     scannerReticle.style.width = `${rw}px`;
     scannerReticle.style.height = `${rh}px`;
 
-    const left = Math.round((vw - rw) / 2);
-    const top = Math.round(vh * 0.25);
+    const left = Math.max(0, Math.round((vw - rw) / 2));
+    const top = Math.max(0, Math.round(vh * 0.2));
 
     scannerReticle.style.left = `${left}px`;
     scannerReticle.style.top = `${top}px`;
@@ -199,6 +199,28 @@ document.addEventListener('DOMContentLoaded', () => {
     updateCropFromReticle();
     if (hudStatus) hudStatus.textContent = 'TARGET CALIBRATED';
   }
+
+  // Handle dynamic viewport resize (orientation change on mobile)
+  window.addEventListener('resize', () => {
+    if (currentFile && loadedImageObj) {
+      const vw = viewportWrapper.clientWidth;
+      const vh = viewportWrapper.clientHeight;
+      const rw = scannerReticle.offsetWidth;
+      const rh = scannerReticle.offsetHeight;
+
+      let curLeft = scannerReticle.offsetLeft;
+      let curTop = scannerReticle.offsetTop;
+
+      if (curLeft + rw > vw) {
+        scannerReticle.style.left = `${Math.max(0, vw - rw)}px`;
+      }
+      if (curTop + rh > vh) {
+        scannerReticle.style.top = `${Math.max(0, vh - rh)}px`;
+      }
+      updateBiometricNodes();
+      updateCropFromReticle();
+    }
+  });
 
   // ── Dynamic Biometric Nodes Placement ──
   function updateBiometricNodes() {

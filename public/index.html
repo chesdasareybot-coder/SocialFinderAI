@@ -1298,11 +1298,390 @@
       font-size: 0.85rem;
     }
 
-    @media (max-width: 640px) {
-      .hero-title { font-size: 2rem; }
-      .search-card { padding: 1.25rem; }
-      .results-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
-      .deep-engines-grid { grid-template-columns: 1fr 1fr; }
+    /* ── Comprehensive Mobile & Tablet Responsiveness ── */
+    @media (max-width: 768px) {
+      header {
+        padding: 1rem 1.25rem;
+      }
+
+      main {
+        padding: 2rem 1rem 4rem;
+      }
+
+      .hero-title {
+        font-size: 2.25rem;
+      }
+
+      .hero-subtitle {
+        font-size: 1rem;
+      }
+
+      .search-card {
+        padding: 1.5rem;
+      }
+
+      .hd-summary-banner {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1.25rem;
+        padding: 1.25rem;
+      }
+
+      .hd-summary-left {
+        gap: 1rem;
+      }
+
+      .btn-inspect-hd {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .grid-matches {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 1.25rem;
+      }
+
+      .hd-modal-card {
+        max-width: 95vw;
+      }
+
+      .comparison-frame {
+        height: 220px;
+      }
+    }
+
+    @media (max-width: 540px) {
+      header {
+        padding: 0.85rem 1rem;
+      }
+
+      .logo span {
+        font-size: 1.05rem;
+      }
+
+      .badge-status {
+        padding: 0.3rem 0.65rem;
+        font-size: 0.725rem;
+      }
+
+      main {
+        padding: 1.5rem 0.75rem 3rem;
+      }
+
+      .hero-text {
+        margin-bottom: 1.75rem;
+      }
+
+      .hero-title {
+        font-size: 1.75rem;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+      }
+
+      .hero-subtitle {
+        font-size: 0.875rem;
+      }
+
+      .search-card {
+        padding: 1rem;
+        border-radius: 1.25rem;
+      }
+
+      .dropzone {
+        padding: 2rem 1rem;
+      }
+
+      .dropzone-text {
+        font-size: 0.95rem;
+      }
+
+      .dropzone-subtext {
+        font-size: 0.8rem;
+      }
+
+      /* Mobile Preview Header: stack gracefully */
+      .preview-container {
+        padding: 0.85rem;
+        gap: 0.75rem;
+      }
+
+      .preview-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.6rem;
+      }
+
+      .hd-status-badge {
+        align-self: flex-start;
+        font-size: 0.7rem;
+        padding: 0.25rem 0.6rem;
+      }
+
+      .viewport-controls {
+        align-self: center;
+        width: 100%;
+        justify-content: center;
+        padding: 4px 8px;
+      }
+
+      .btn-ctrl {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+      }
+
+      .zoom-level {
+        min-width: 48px;
+        font-size: 0.775rem;
+      }
+
+      .preview-tabs {
+        width: 100%;
+        display: flex;
+      }
+
+      .preview-tab {
+        flex: 1;
+        text-align: center;
+        padding: 0.45rem 0.5rem;
+        font-size: 0.75rem;
+      }
+
+      /* Mobile Viewport Sizing */
+      .viewport-wrapper {
+        height: 270px;
+        border-radius: 0.85rem;
+      }
+
+      .scanner-reticle {
+        width: 120px !important;
+        height: 140px !important;
+      }
+
+      .reticle-corner {
+        width: 14px;
+        height: 14px;
+        border-width: 2.5px;
+      }
+
+      .reticle-grip-handle {
+        padding: 3px 6px;
+        font-size: 0.52rem;
+      }
+
+      .scanner-hud-text {
+        font-size: 0.65rem;
+        padding: 4px 8px;
+        bottom: 8px;
+        left: 8px;
+        right: 8px;
+      }
+
+      .viewport-hint-bar {
+        font-size: 0.7rem;
+        padding: 0.45rem 0.65rem;
+      }
+
+      .preview-details {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.6rem;
+      }
+
+      .file-name {
+        max-width: 100%;
+        font-size: 0.85rem;
+      }
+
+      .btn-secondary {
+        width: 100%;
+        text-align: center;
+        padding: 0.55rem;
+      }
+
+      .btn-search {
+        padding: 0.9rem;
+        font-size: 0.95rem;
+        border-radius: 0.85rem;
+      }
+
+      /* Telemetry Box Mobile */
+      .scanning-box {
+        padding: 1.15rem;
+      }
+
+      .telemetry-radar-wrapper {
+        gap: 0.85rem;
+      }
+
+      .telemetry-radar {
+        width: 44px;
+        height: 44px;
+      }
+
+      .scanning-title {
+        font-size: 0.95rem;
+      }
+
+      .scanning-desc {
+        font-size: 0.775rem;
+      }
+
+      .telemetry-log {
+        font-size: 0.7rem;
+        padding: 0.65rem 0.85rem;
+      }
+
+      /* Results Header Mobile */
+      .results-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.85rem;
+      }
+
+      .results-title-group h3 {
+        font-size: 1.35rem;
+      }
+
+      #btn-new-search {
+        width: 100%;
+        text-align: center;
+      }
+
+      /* HD Summary Banner Mobile */
+      .hd-summary-banner {
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
+        padding: 1rem;
+        gap: 1rem;
+      }
+
+      .hd-summary-left {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 0.75rem;
+      }
+
+      .hd-summary-info {
+        text-align: center;
+      }
+
+      .hd-summary-title {
+        font-size: 1.1rem;
+      }
+
+      .hd-summary-sub {
+        font-size: 0.8rem;
+      }
+
+      .hd-summary-stats {
+        justify-content: center;
+      }
+
+      .btn-inspect-hd {
+        width: 100%;
+        justify-content: center;
+        padding: 0.65rem;
+        font-size: 0.825rem;
+      }
+
+      /* Deep Engines Bar Mobile */
+      .deep-engines-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.6rem;
+      }
+
+      .engine-btn {
+        padding: 0.65rem 0.5rem;
+        font-size: 0.75rem;
+        gap: 0.4rem;
+      }
+
+      /* Result Cards Mobile: Single Column full width */
+      .grid-matches {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+
+      .card-match {
+        padding: 1rem;
+      }
+
+      .match-image-frame {
+        height: 180px;
+      }
+
+      .match-username {
+        font-size: 1.05rem;
+      }
+
+      .match-snippet {
+        font-size: 0.8rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .btn-profile {
+        padding: 0.6rem 0.85rem;
+        font-size: 0.825rem;
+      }
+
+      /* Modal Mobile: Stack Comparison Columns */
+      .hd-modal-backdrop {
+        padding: 0.75rem;
+      }
+
+      .hd-modal-card {
+        max-height: 92vh;
+        overflow-y: auto;
+        border-radius: 1.15rem;
+      }
+
+      .hd-modal-header {
+        padding: 1rem;
+      }
+
+      .hd-modal-title {
+        font-size: 0.95rem;
+      }
+
+      .hd-modal-body {
+        padding: 1rem;
+      }
+
+      .comparison-grid {
+        grid-template-columns: 1fr;
+        gap: 0.85rem;
+        margin-bottom: 1rem;
+      }
+
+      .comparison-frame {
+        height: 190px;
+      }
+
+      .lightbox-details {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+        padding-top: 1rem;
+      }
+
+      .btn-lightbox-visit {
+        width: 100%;
+        text-align: center;
+        padding: 0.7rem;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .deep-engines-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-title {
+        font-size: 1.55rem;
+      }
     }
   </style>
 </head>
