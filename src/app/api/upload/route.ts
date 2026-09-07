@@ -28,7 +28,6 @@ interface EngineResult {
   matches: Match[];
   identityTags: string[];
   deepSearchLinks: {
-    facecheck: string;
     googleLens: string;
     yandex: string;
     bing: string;
@@ -333,7 +332,6 @@ async function runFaceEngine(
 
     const encodedUrl = encodeURIComponent(publicImageUrl);
     const deepSearchLinks = {
-      facecheck: "https://facecheck.id",
       googleLens: `https://lens.google.com/uploadbyurl?url=${encodedUrl}`,
       yandex: `https://yandex.com/images/search?rpt=imageview&url=${encodedUrl}`,
       bing: `https://www.bing.com/images/search?view=detailv2&iss=sbi&q=imgurl:${encodedUrl}`,
@@ -357,7 +355,6 @@ async function runFaceEngine(
       matches: [],
       identityTags: [],
       deepSearchLinks: {
-        facecheck: "https://facecheck.id",
         googleLens: "",
         yandex: "",
         bing: "",

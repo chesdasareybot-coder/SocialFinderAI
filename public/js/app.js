@@ -632,10 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 3. Render Deep Reverse Search Engines Toolbar
     const deepEnginesBar = document.getElementById('deep-engines-bar');
-    if (deepLinks.googleLens || deepLinks.yandex || deepLinks.bing || deepLinks.facecheck) {
-      if (document.getElementById('link-facecheck')) {
-        document.getElementById('link-facecheck').href = deepLinks.facecheck || 'https://facecheck.id';
-      }
+    if (deepLinks.googleLens || deepLinks.yandex || deepLinks.bing || deepLinks.tineye) {
       document.getElementById('link-google-lens').href = deepLinks.googleLens || '#';
       document.getElementById('link-yandex').href = deepLinks.yandex || '#';
       document.getElementById('link-bing').href = deepLinks.bing || '#';
@@ -654,14 +651,14 @@ document.addEventListener('DOMContentLoaded', () => {
       hdSummaryCropImg.src = faceAvatarUrl;
     }
 
-    resultsCountText.textContent = 'Biometric signature calibrated. Launch a neural face search engine below to query billions of public faces:';
+    resultsCountText.textContent = 'Biometric signature calibrated. Launch a 100% free neural face search engine below:';
 
     matchesGrid.innerHTML = `
       <div class="card-match" style="border-color: rgba(66, 133, 244, 0.45); background: linear-gradient(180deg, rgba(66, 133, 244, 0.12), rgba(15, 23, 42, 0.8));">
         <div class="match-image-frame" style="cursor: pointer;" onclick="window.open('${deepLinks.googleLens}', '_blank')">
           ${faceAvatarUrl ? `<img src="${faceAvatarUrl}" alt="Calibrated Face" class="match-avatar-img" />` : ''}
           <div class="match-platform-badge" style="background: #4285F4; color: #fff;">Google Lens</div>
-          <div class="match-score-badge"><span>100% Real Match</span></div>
+          <div class="match-score-badge"><span>100% Free Match</span></div>
         </div>
         <div class="match-content">
           <div class="match-username">Google Lens HD Neural Search</div>
@@ -691,23 +688,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
 
-      <div class="card-match" style="border-color: rgba(239, 68, 68, 0.45); background: linear-gradient(180deg, rgba(239, 68, 68, 0.12), rgba(15, 23, 42, 0.8));">
-        <div class="match-image-frame" style="cursor: pointer;" onclick="window.open('${deepLinks.facecheck}', '_blank')">
-          ${faceAvatarUrl ? `<img src="${faceAvatarUrl}" alt="Calibrated Face" class="match-avatar-img" />` : ''}
-          <div class="match-platform-badge" style="background: #EF4444; color: #fff;">FaceCheck</div>
-          <div class="match-score-badge"><span>Facial ID</span></div>
-        </div>
-        <div class="match-content">
-          <div class="match-username">FaceCheck.ID Database</div>
-          <div class="match-snippet">Dedicated facial recognition database cross-referencing public mugshots, news, dating profiles, and social networks using biometric face vectors.</div>
-          <div class="match-actions">
-            <a href="${deepLinks.facecheck}" target="_blank" rel="noopener noreferrer" class="btn-profile" style="background: linear-gradient(135deg, #be123c, #e11d48); border: none; font-weight: 700;">
-              Search Face on FaceCheck &nearr;
-            </a>
-          </div>
-        </div>
-      </div>
-
       <div class="card-match" style="border-color: rgba(14, 165, 233, 0.45); background: linear-gradient(180deg, rgba(14, 165, 233, 0.12), rgba(15, 23, 42, 0.8));">
         <div class="match-image-frame" style="cursor: pointer;" onclick="window.open('${deepLinks.bing}', '_blank')">
           ${faceAvatarUrl ? `<img src="${faceAvatarUrl}" alt="Calibrated Face" class="match-avatar-img" />` : ''}
@@ -720,6 +700,23 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="match-actions">
             <a href="${deepLinks.bing}" target="_blank" rel="noopener noreferrer" class="btn-profile" style="background: linear-gradient(135deg, #0f766e, #0d9488); border: none; font-weight: 700;">
               Search Face on Bing &nearr;
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-match" style="border-color: rgba(0, 160, 227, 0.45); background: linear-gradient(180deg, rgba(0, 160, 227, 0.12), rgba(15, 23, 42, 0.8));">
+        <div class="match-image-frame" style="cursor: pointer;" onclick="window.open('${deepLinks.tineye}', '_blank')">
+          ${faceAvatarUrl ? `<img src="${faceAvatarUrl}" alt="Calibrated Face" class="match-avatar-img" />` : ''}
+          <div class="match-platform-badge" style="background: #00A0E3; color: #fff;">TinEye</div>
+          <div class="match-score-badge"><span>Exact Source</span></div>
+        </div>
+        <div class="match-content">
+          <div class="match-username">TinEye Reverse Search</div>
+          <div class="match-snippet">Identifies the earliest published instances and original sources of photos across the web using inverse perceptual image hashing.</div>
+          <div class="match-actions">
+            <a href="${deepLinks.tineye}" target="_blank" rel="noopener noreferrer" class="btn-profile" style="background: linear-gradient(135deg, #0284c7, #0369a1); border: none; font-weight: 700;">
+              Search Face on TinEye &nearr;
             </a>
           </div>
         </div>
